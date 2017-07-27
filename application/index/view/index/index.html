@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="__STATIC__/css/style.css" rel="stylesheet" type="text/css">
+    <title>收银台- {$trade_type}</title>
+</head>
+<body touchstart>
+<main class="contain-box">
+    <section class="sy-content">
+        <div class="sy-shop">
+            <img src="__STATIC__/img/shop.png" alt="店家商标" class="img1">
+            <p class="p1">福州宝龙店旗舰店</p>
+        </div>
+        <div class="sy-money">
+            <p id="result">result: </p>
+            <p class="p2">openid:{$openid}</p>
+            <p class="p2">金额</p>
+            <p class="p3 relative">
+                ￥<i class="blink" style="">&nbsp;</i><input type="price" class="money-input" placeholder="0.00"
+                                                            readonly id="order_amt"/>
+                <button class="clear-btn"></button>
+            </p>
+        </div>
+    </section>
+    <input type="hidden" name="store_id" value="{$store_id}" id="store_id"/>
+    <input type="hidden" name="trade_type" value="{$trade_type}" id="trade_type"/>
+    <button class="btn-block btn-gray" id="pay">确认支付</button>
+
+    <p class="mark">由上海富友提供技术支持和交易保障</p>
+</main>
+<section class="keyboard-panel" id="keyboard">
+    <table class="keyboard-table" id="num-keyboard">
+        <tr>
+            <td data-value="1">1</td>
+            <td data-value="2">2</td>
+            <td data-value="3">3</td>
+            <td rowspan="2" class="grey-bg" data-value="100"><img src="__STATIC__/img/clear.png" alt="按钮清除"/></td>
+        </tr>
+        <tr>
+            <td data-value="4">4</td>
+            <td data-value="5">5</td>
+            <td data-value="6">6</td>
+        </tr>
+        <tr>
+            <td data-value="7">7</td>
+            <td data-value="8">8</td>
+            <td data-value="9">9</td>
+            <td rowspan="2" data-value="99">确定</td>
+        </tr>
+        <tr>
+            <td data-value="0">0</td>
+            <td data-value=".">.</td>
+            <td data-value="99"><img src="__STATIC__/img/keybord.png" alt="收下键盘"/></td>
+        </tr>
+    </table>
+</section>
+
+<script type="text/javascript" src="__STATIC__/js/jquery-1.10.2.min.js"></script>
+<script type="text/javascript" src="__STATIC__/js/common.js"></script>
+</body>
+<script type="text/javascript">
+
+    $(document).ready(function () {
+
+        // 调试时可以通过在页面定义一个元素，打印信息，使用alert方法不够优雅
+        function log(obj) {
+            $("#result").append(obj).append(" ").append("<br />");
+        }
+
+        //点击支付
+        $("#pay").click(function () {
+
+//            var order_amt = parseInt($("#order_amt").val());
+            var order_amt = 100;                //总金额，单位分
+            var store_id = "{$store_id}";       //店铺id
+            var trade_type = "{$trade_type}";   //支付方式  FWC JSAPI
+            var openid = "{$openid}" || "";           //微信支付时需要
+
+
+            $.ajax({
+                type: "POST",
+                url: "http://pdf.ipvp.cn/index.php/index/Index/order",
+                data: "order_amt=" + order_amt + "&trade_type=" + trade_type + "&store_id=" + store_id + "&openid=" + openid,
+                success: function (returnData) {
+                    console.log(returnData);
+                    console.log(returnData.data.sdk_package);
+                    console.log(typeof returnData);
+                    alert("order_amt=" + order_amt + "&trade_type=" + trade_type + "&store_id=" + store_id + "&openid=" + openid);
+                    var ret = JSON.stringify(returnData);
+                    log(ret);
+                    if (returnData.code == '200') {
+                        //调起微信支付
+                        if ("{$trade_type}" == "JSAPI") {
+                            //微信支付调起方式
+                            function onBridgeReady() {
+                                WeixinJSBridge.invoke(
+                                    'getBrandWCPayRequest', {
+                                        "appId": returnData.data.sdk_appid,     //公众号名称，由商户传入
+                                        "timeStamp": returnData.data.sdk_timestamp,         //时间戳 ，自1970年以来的秒数
+                                        "nonceStr": returnData.data.sdk_noncestr, //随机串
+                                        "package": returnData.data.sdk_package,
+                                        "signType": returnData.data.sdk_signtype,         //微信签名方式：
+                                        "paySign": returnData.data.sdk_paysign //微信签名
+                                    },
+                                    function (res) {
+                                        if (res.err_msg == "get_brand_wcpay_request:ok") {
+                                        }     // 使用以上方式判断前端返回,微信团队郑重提示：res.err_msg将在用户支付成功后返回    ok，但并不保证它绝对可靠。
+                                    }
+                                );
+                            }
+
+                            if (typeof WeixinJSBridge == "undefined") {
+                                if (document.addEventListener) {
+                                    document.addEventListener('WeixinJSBridgeReady', onBridgeReady, false);
+                                } else if (document.attachEvent) {
+                                    document.attachEvent('WeixinJSBridgeReady', onBridgeReady);
+                                    document.attachEvent('onWeixinJSBridgeReady', onBridgeReady);
+                                }
+                            } else {
+                                onBridgeReady();
+                            }
+                        }
+                        //调起支付宝支付
+                        if ("{$trade_type}" == "FWC") {
+
+                            // 由于js的载入是异步的，所以可以通过该方法，当AlipayJSBridgeReady事件发生后，再执行callback方法
+                            function ready(callback) {
+                                if (window.AlipayJSBridge) {
+                                    callback && callback();
+                                } else {
+                                    document.addEventListener('AlipayJSBridgeReady', callback, false);
+                                }
+                            }
+
+                            function tradePay(tradeNO) {
+                                ready(function () {
+                                    // 通过传入交易号唤起快捷调用方式(注意tradeNO大小写严格)
+                                    AlipayJSBridge.call("tradePay", {
+                                        tradeNO: tradeNO
+                                    }, function (data) {
+                                        log(JSON.stringify(data));
+                                        if ("9000" == data.resultCode) {
+                                            log("支付成功");
+                                        }
+                                    });
+                                });
+                            }
+
+                            tradePay(returnData.data.session_id);
+
+                            //其他api
+                            // 点击payButton按钮后唤起收银台
+                            $("#payButton").click(function () {
+                                tradePay("${tradeNO}");
+                            });
+
+                            // 通过jsapi关闭当前窗口，仅供参考，更多jsapi请访问
+                            // https://doc.open.alipay.com/docs/doc.htm?treeId=193&articleId=104510&docType=1
+                            $("#closeButton").click(function () {
+                                AlipayJSBridge.call('closeWebview');
+                            });
+
+                        }
+                    } else {
+                        alert("错误信息：" + returnData.msg);
+                    }
+                },
+                error: function (e) {
+                    alert("服务器连接失败");
+                }
+            });
+        });
+
+
+    });
+
+</script>
+
+</html>
